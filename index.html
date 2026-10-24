@@ -20,44 +20,61 @@ select{width:100%;margin:6px 0}
 .pri{background:var(--acc);font-weight:700}.dng{color:var(--r)}.full{width:100%;margin-top:10px}
 .card{background:var(--card);border-radius:18px;padding:14px;margin:12px 0}
 .row{display:flex;gap:8px;margin-top:8px}.row>*{flex:1;min-width:0}
-input{width:100%;height:58px;font-size:22px;text-align:center;background:var(--c2);color:var(--tx);border:0;border-radius:12px}
+input{width:100%;height:56px;font-size:22px;text-align:center;background:var(--c2);color:var(--tx);border:0;border-radius:12px}
 .txt{font-size:18px;text-align:left;padding:0 12px}
+.fld small{display:block;margin-bottom:4px}
+.wh{position:relative;height:132px;margin-top:6px;border-radius:12px;background:var(--c2);overflow:hidden}
+.wh::after{content:"";position:absolute;left:6px;right:6px;top:44px;height:44px;border-radius:10px;border:2px solid var(--acc);pointer-events:none}
+.wheel{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;padding:44px 0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.wheel::-webkit-scrollbar{display:none}
+.wi{height:44px;line-height:44px;text-align:center;font-size:20px;scroll-snap-align:center}
 .set{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:18px}
 .x{min-height:44px;width:44px;padding:0;background:none;color:var(--mut)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{min-height:40px;padding:0 12px;border-radius:20px;background:var(--c2);display:inline-flex;align-items:center;gap:6px;font-size:15px}
 .up{color:var(--g)}.dn{color:var(--r)}
 .fl{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.fl button{white-space:nowrap;min-height:46px}
-.fl .on,nav .on{background:var(--acc)}
+.fw{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.fw button{min-height:46px}
+.fl .on,.fw .on,nav .on{background:var(--acc)}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:#0b0d11}
 nav button{flex:1;padding:0;font-size:13px;min-height:58px}
 #bar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));background:var(--acc);border-radius:16px;padding:6px 8px 6px 18px;display:flex;justify-content:space-between;align-items:center;font-size:20px}
-#bar[hidden]{display:none}#bar button{background:rgba(0,0,0,.25);min-height:46px}
+#bar.done{background:var(--g);color:#000}
+#bar[hidden]{display:none}#bar button{background:rgba(0,0,0,.25);min-height:46px;padding:0 14px;font-size:16px}
 #toast{position:fixed;top:calc(20px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:#fff;color:#000;padding:12px 20px;border-radius:24px;font-weight:600;opacity:0;transition:opacity .4s;pointer-events:none;z-index:9}
 #toast.show{opacity:1;transition:none}
 textarea{width:100%;height:110px;background:var(--c2);color:var(--tx);border:0;border-radius:12px;padding:8px}
 .hx{margin-top:10px}
 </style></head><body>
 <div id="app"></div>
-<div id="bar" hidden><span>Set break <b id="tm">0:00</b></span><button data-act="stop">✕</button></div>
+<div id="bar" hidden><span>Rest <b id="tm">0:00</b></span><span><button data-act="plus">+15s</button> <button data-act="stop">✕</button></span></div>
 <div id="toast"></div>
 <nav>
-<button data-act="view" data-v="workouts">🏋️<br>Workouts</button>
+<button data-act="view" data-v="home">🏋️<br>Exercises</button>
 <button data-act="view" data-v="history">🕘<br>History</button>
 <button data-act="view" data-v="progress">📈<br>Progress</button>
 <button data-act="view" data-v="settings">⚙️<br>Settings</button>
 </nav>
 <script>
 const $=s=>document.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
 let S=null;
 try{S=JSON.parse(localStorage.getItem('lift')||'null')}catch(e){}
-S=Object.assign({folders:[],workouts:[],sessions:[],unit:'lb',mode:'top',active:null,draft:{}},S||{});
+S=Object.assign({folders:[],exercises:[],logs:[],cur:null,unit:'lb',mode:'top',rest:90,step:2.5,draft:{}},S||{});
+function migrate(){ /* converts the first version (workouts of exercises) to exercises tagged with folders */
+  if(!S.workouts&&!S.sessions)return;
+  const m={};
+  (S.workouts||[]).forEach(w=>w.exercises.forEach(e=>{const x=m[e.id]||(m[e.id]={id:e.id,name:e.name,type:e.type,folders:[]});if(w.folderId&&!x.folders.includes(w.folderId))x.folders.push(w.folderId)}));
+  S.exercises=S.exercises.concat(Object.values(m));
+  (S.sessions||[]).forEach(s=>s.entries.forEach(e=>S.logs.push({id:uid(),exId:e.exId,name:e.name,type:e.type,date:s.date,sets:e.sets})));
+  delete S.workouts;delete S.sessions;delete S.active;
+}
+migrate();
 const save=()=>{try{localStorage.setItem('lift',JSON.stringify(S))}catch(e){}};
-const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sum=a=>a.reduce((x,y)=>x+y,0);
 const fmt=n=>n==null?'-':String(Math.round(n*10)/10);
-let view='workouts',filter='all',sel=null,histOpen=null,pex=null,pm='c',timerStart=null,tt;
+let view=S.cur?'ex':'home',filter='all',adding=false,histOpen=null,pex=null,pm='c',timerEnd=null,beeped=false,ac=null,tt;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1100)}
 
@@ -71,7 +88,14 @@ function metrics(type,sets){
 }
 const labels=t=>t==='cardio'?['Level','Time','Dist']:['Weight','Reps','Volume'];
 const sfmt=s=>s.w!==undefined?s.w+'×'+s.r:s.t+'min L'+s.l+(s.d?' · '+s.d:'');
-function last(exId){for(let i=S.sessions.length-1;i>=0;i--){const e=S.sessions[i].entries.find(x=>x.exId===exId&&x.sets.length);if(e)return e}return null}
+function last(exId){for(let i=S.logs.length-1;i>=0;i--)if(S.logs[i].exId===exId)return S.logs[i];return null}
+function commitCur(){
+  const c=S.cur;
+  if(c&&c.sets.length)S.logs.push({id:uid(),exId:c.exId,name:c.name,type:c.type,date:c.date,sets:c.sets});
+  if(c)delete S.draft[c.exId];
+  S.cur=null;
+}
+function go(v){if(view==='ex'&&v!=='ex')commitCur();view=v}
 
 function chip(label,cur,prev,toggle){
   let h=label+' <b>'+fmt(cur)+'</b>';
@@ -86,47 +110,52 @@ const draftOf=(ent,lt)=>{
   return Object.assign(b,S.draft[ent.exId]);
 };
 
+/* ---------- wheels ---------- */
+function wheelItems(c){let h='';const n=Math.floor((c[1]-c[0])/c[2]+1e-9);for(let i=0;i<=n;i++)h+='<div class="wi">'+Math.round((c[0]+i*c[2])*100)/100+'</div>';return h}
+function setWheel(w,val){
+  const mn=+w.dataset.min,st=+w.dataset.step,n=w.children.length-1;
+  let i=Math.round((+val-mn)/st);if(!(i>=0))i=0;if(i>n)i=n;
+  w._lock=Date.now()+350;w.scrollTop=i*44;
+}
+function initWheels(){document.querySelectorAll('.wheel').forEach(w=>setWheel(w,w.closest('.fld').querySelector('input').value||w.dataset.min))}
+
 /* ---------- views ---------- */
-function exCard(ent,i){
-  const cardio=ent.type==='cardio',lt=last(ent.exId),d=draftOf(ent,lt),L=labels(ent.type);
+function exCard(){
+  const ent=S.cur,cardio=ent.type==='cardio',lt=last(ent.exId),d=draftOf(ent,lt),L=labels(ent.type);
   const cur=metrics(ent.type,ent.sets),pv=lt&&metrics(ent.type,lt.sets);
-  const fld=(f,p,v)=>`<div><small>${p}</small><input type="number" inputmode="decimal" step="any" data-ex="${ent.exId}" data-f="${f}" value="${v}"></div>`;
+  const fld=(f,p,v,c)=>`<div class="fld"><small>${p}</small><input type="number" inputmode="decimal" step="any" data-ex="${ent.exId}" data-f="${f}" value="${v}">${c?`<div class="wh"><div class="wheel" data-min="${c[0]}" data-max="${c[1]}" data-step="${c[2]}">${wheelItems(c)}</div></div>`:''}</div>`;
   return `<div class="card"><h3>${esc(ent.name)}</h3>
   ${lt?`<div class="mut">Last: ${lt.sets.map(sfmt).join(', ')}</div>`:''}
-  ${ent.sets.map((s,j)=>`<div class="set"><span>${j+1}. ${sfmt(s)}</span><button class="x" data-act="delset" data-i="${i}" data-j="${j}">✕</button></div>`).join('')}
+  ${ent.sets.map((s,j)=>`<div class="set"><span>${j+1}. ${sfmt(s)}</span><button class="x" data-act="delset" data-j="${j}">✕</button></div>`).join('')}
   ${cur?`<div class="chips">${[0,1,2].map(k=>chip(L[k],cur['abc'[k]],pv&&pv['abc'[k]],k<2)).join('')}</div>`:''}
-  <div class="row">${cardio?fld('t','Minutes',d.t)+fld('l','Level',d.l)+fld('d','Distance',d.d):fld('w','Weight ('+S.unit+')',d.w)+fld('r','Reps',d.r)}</div>
-  <button class="pri full" data-act="log" data-i="${i}">Log set</button></div>`;
+  <div class="row">${cardio?fld('t','Minutes',d.t,[0,120,1])+fld('l','Level',d.l,[0,30,1])+fld('d','Distance',d.d):fld('w','Weight ('+S.unit+')',d.w,[0,600,+S.step||2.5])+fld('r','Reps',d.r,[0,60,1])}</div>
+  <button class="pri full" data-act="log">Log set</button></div>`;
 }
-function vSess(){
-  const a=S.active;if(!a){view='workouts';return vWork()}
-  return `<h2>${esc(a.name)}</h2><div class="mut">Tap Weight, Reps or Level chips to switch top set / average.</div>`+
-  a.entries.map(exCard).join('')+
-  `<button class="pri full" data-act="finish">Finish workout</button><button class="full dng" data-act="cancel">Cancel workout</button>`;
+function vEx(){
+  const c=S.cur,e=c&&S.exercises.find(x=>x.id===c.exId);
+  if(!e){S.cur=null;view='home';return vHome()}
+  return `<button data-act="back">← Back</button> <small>Swipe left to go back</small>
+  ${exCard()}
+  <div class="card"><small>Folders this exercise belongs to (tap to add or remove)</small><div class="fw">${S.folders.map(f=>`<button class="${e.folders.includes(f.id)?'on':''}" data-act="tag" data-id="${f.id}">${esc(f.name)}</button>`).join('')||'<small>No folders yet. Create one on the Exercises screen.</small>'}</div></div>
+  <button class="full dng" data-act="delex">Delete exercise</button>`;
 }
-function vWork(){
-  if(sel){
-    const w=S.workouts.find(x=>x.id===sel);if(!w){sel=null;return vWork()}
-    return `<button data-act="back">← Back</button><h2>${esc(w.name)}</h2>
-    <div class="card"><small>Folder</small><select data-chg="folder"><option value="">Unsorted</option>${S.folders.map(f=>`<option value="${f.id}"${f.id===w.folderId?' selected':''}>${esc(f.name)}</option>`).join('')}</select></div>
-    ${w.exercises.map(e=>`<div class="card set"><span>${esc(e.name)} ${e.type==='cardio'?'<small>cardio</small>':''}</span><button class="x" data-act="delex" data-id="${e.id}">✕</button></div>`).join('')}
-    <div class="card"><input id="nx" class="txt" placeholder="New exercise name"><select id="nt"><option value="lift">Weights</option><option value="cardio">Cardio</option></select><button class="full" data-act="addex">+ Add exercise</button></div>
-    <button class="pri full" data-act="start">Start workout</button><button class="full dng" data-act="delw">Delete workout</button>`;
-  }
-  const list=S.workouts.filter(w=>filter==='all'||w.folderId===filter);
-  const fn=id=>(S.folders.find(f=>f.id===id)||{name:'Unsorted'}).name;
-  return `<h2>Workouts</h2>
+function vHome(){
+  const list=S.exercises.filter(e=>filter==='all'||e.folders.includes(filter));
+  const fname=id=>(S.folders.find(f=>f.id===id)||{}).name;
+  const f=S.folders.find(x=>x.id===filter);
+  return `<h2>Exercises</h2>
   <div class="fl"><button class="${filter==='all'?'on':''}" data-act="filter" data-id="all">All</button>${S.folders.map(f=>`<button class="${filter===f.id?'on':''}" data-act="filter" data-id="${f.id}">${esc(f.name)}</button>`).join('')}</div>
-  <div class="row"><button data-act="addf">+ Folder</button><button class="pri" data-act="addw">+ Workout</button></div>
-  ${filter!=='all'?'<button class="full dng" data-act="delf">Delete this folder</button>':''}
-  ${list.length?list.map(w=>`<div class="card" data-act="open" data-id="${w.id}"><h3>${esc(w.name)}</h3><div class="mut">${esc(fn(w.folderId))} · ${w.exercises.length} exercises</div></div>`).join(''):'<p class="mut">No workouts here yet. Tap + Workout.</p>'}`;
+  <div class="row"><button data-act="addf">+ Folder</button><button class="pri" data-act="adde">+ Exercise</button></div>
+  ${f?'<button class="full dng" data-act="delf">Delete folder “'+esc(f.name)+'”</button>':''}
+  ${adding?`<div class="card"><input id="nx" class="txt" placeholder="Exercise name"><select id="nt"><option value="lift">Weights</option><option value="cardio">Cardio</option></select><button class="pri full" data-act="addex">Add${f?' to '+esc(f.name):''}</button></div>`:''}
+  ${list.length?list.map(e=>`<div class="card" data-act="open" data-id="${e.id}"><h3>${esc(e.name)}${e.type==='cardio'?' <small>cardio</small>':''}</h3><div class="mut">${esc(e.folders.map(fname).filter(Boolean).join(', ')||'No folder')}</div></div>`).join(''):'<p class="mut">Nothing here yet. Tap + Exercise.</p>'}`;
 }
 function vHist(){
-  if(!S.sessions.length)return '<h2>History</h2><p class="mut">No workouts logged yet.</p>';
-  return '<h2>History</h2>'+[...S.sessions].reverse().map(s=>{
-    const vol=sum(s.entries.map(e=>e.type==='cardio'?0:sum(e.sets.map(x=>x.w*x.r))));
-    return `<div class="card"><div data-act="hopen" data-id="${s.id}"><b>${esc(s.name)}</b><div class="mut">${new Date(s.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · ${vol?vol+' '+S.unit+' volume':s.entries.length+' exercises'}</div></div>
-    ${histOpen===s.id?s.entries.map(e=>`<div class="hx"><b>${esc(e.name)}</b><div>${e.sets.map(sfmt).join(' · ')}</div></div>`).join('')+`<button class="full dng" data-act="delsess" data-id="${s.id}">Delete this workout</button>`:''}</div>`;
+  if(!S.logs.length)return '<h2>History</h2><p class="mut">Nothing logged yet.</p>';
+  return '<h2>History</h2>'+[...S.logs].reverse().map(l=>{
+    const vol=l.type==='cardio'?0:sum(l.sets.map(x=>x.w*x.r));
+    return `<div class="card"><div data-act="hopen" data-id="${l.id}"><b>${esc(l.name)}</b><div class="mut">${new Date(l.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · ${l.sets.length} sets${vol?' · '+vol+' '+S.unit:''}</div></div>
+    ${histOpen===l.id?`<div class="hx">${l.sets.map(sfmt).join(' · ')}</div><button class="full dng" data-act="dellog" data-id="${l.id}">Delete this entry</button>`:''}</div>`;
   }).join('');
 }
 function chart(pts){
@@ -141,13 +170,12 @@ function chart(pts){
 }
 function vProg(){
   const ex={};
-  S.workouts.forEach(w=>w.exercises.forEach(e=>ex[e.id]=e));
-  S.sessions.forEach(s=>s.entries.forEach(e=>{ex[e.exId]=ex[e.exId]||{id:e.exId,name:e.name,type:e.type}}));
-  const list=Object.values(ex).filter(e=>S.sessions.some(s=>s.entries.some(x=>x.exId===e.id)));
-  if(!list.length)return '<h2>Progress</h2><p class="mut">Finish a workout to see graphs.</p>';
-  if(!list.find(e=>e.id===pex)){pex=list[0].id;pm=list[0].type==='cardio'?'b':'c'}
+  S.logs.forEach(l=>{ex[l.exId]={id:l.exId,name:(S.exercises.find(e=>e.id===l.exId)||l).name,type:l.type}});
+  const list=Object.values(ex);
+  if(!list.length)return '<h2>Progress</h2><p class="mut">Log some sets to see graphs.</p>';
+  if(!ex[pex]){pex=list[0].id;pm=list[0].type==='cardio'?'b':'c'}
   const e=ex[pex],tabs=e.type==='cardio'?[['b','Time'],['a','Level'],['c','Distance']]:[['c','Volume'],['a','Weight'],['b','Reps']];
-  const pts=S.sessions.filter(s=>s.entries.some(x=>x.exId===pex)).map(s=>({x:s.date,y:metrics(e.type,s.entries.find(x=>x.exId===pex).sets)[pm]}));
+  const pts=S.logs.filter(l=>l.exId===pex).map(l=>({x:l.date,y:metrics(l.type,l.sets)[pm]}));
   return `<h2>Progress</h2><select data-chg="pex">${list.map(x=>`<option value="${x.id}"${x.id===pex?' selected':''}>${esc(x.name)}</option>`).join('')}</select>
   <div class="fl">${tabs.map(t=>`<button class="${pm===t[0]?'on':''}" data-act="pm" data-id="${t[0]}">${t[1]}</button>`).join('')}</div>
   <div class="card">${chart(pts)}</div><div class="mut">Weight, reps and level use the ${S.mode==='top'?'top set':'average'} of each session.</div>`;
@@ -156,65 +184,91 @@ function vSet(){
   return `<h2>Settings</h2>
   <button class="full" data-act="unit">Weight unit: ${S.unit} (tap to switch)</button>
   <button class="full" data-act="mode">Compare using: ${S.mode==='top'?'Top set':'Average'} (tap to switch)</button>
+  <div class="card"><small>Rest timer (seconds)</small><input type="number" inputmode="numeric" data-set="rest" value="${S.rest}">
+  <small style="display:block;margin-top:10px">Weight wheel step (${S.unit})</small><input type="number" inputmode="decimal" data-set="step" value="${S.step}"></div>
   <div class="card"><h3>Backup</h3><textarea id="bk" placeholder="Export fills this box. To restore, paste a backup here and tap Import."></textarea>
   <div class="row"><button data-act="exp">Export</button><button data-act="imp">Import</button></div></div>`;
 }
 function render(){
-  const v={workouts:vWork,session:vSess,history:vHist,progress:vProg,settings:vSet}[view]();
-  $('#app').innerHTML=(S.active&&view!=='session'?'<button class="pri full" style="margin:0 0 8px" data-act="view" data-v="session">▶ Workout in progress – resume</button>':'')+v;
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===(view==='session'?'workouts':view)));
+  $('#app').innerHTML={home:vHome,ex:vEx,history:vHist,progress:vProg,settings:vSet}[view]();
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===(view==='ex'?'home':view)));
+  initWheels();
 }
+
+/* ---------- countdown timer ---------- */
+function beep(){try{const c=ac,o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);g.gain.value=.25;o.frequency.value=880;o.start();o.stop(c.currentTime+.4)}catch(e){}}
 function tick(){
-  const b=$('#bar');b.hidden=!timerStart;if(!timerStart)return;
-  const s=Math.floor((Date.now()-timerStart)/1000);$('#tm').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  const b=$('#bar');b.hidden=!timerEnd;if(!timerEnd)return;
+  const s=Math.ceil((timerEnd-Date.now())/1000);
+  if(s<=0){$('#tm').textContent='Go!';b.classList.add('done');if(!beeped){beeped=true;beep();try{navigator.vibrate&&navigator.vibrate(300)}catch(e){}}}
+  else{b.classList.remove('done');$('#tm').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 }
-setInterval(tick,500);
+setInterval(tick,250);
 
 /* ---------- actions ---------- */
 document.addEventListener('click',ev=>{
   const t=ev.target.closest('[data-act]');if(!t)return;
   const a=t.dataset.act,id=t.dataset.id;
   switch(a){
-    case 'view':view=t.dataset.v;if(view==='workouts')sel=null;break;
-    case 'back':sel=null;break;
-    case 'open':sel=id;break;
+    case 'view':go(t.dataset.v);break;
+    case 'back':commitCur();view='home';break;
+    case 'open':{const e=S.exercises.find(x=>x.id===id);if(S.cur&&S.cur.exId!==id)commitCur();
+      if(!S.cur)S.cur={exId:id,name:e.name,type:e.type,date:Date.now(),sets:[]};view='ex';break}
     case 'filter':filter=id;break;
     case 'addf':{const n=prompt('Folder name (e.g. Push)');if(n&&n.trim()){const f={id:uid(),name:n.trim()};S.folders.push(f);filter=f.id}break}
-    case 'delf':if(confirm('Delete this folder? Its workouts will become Unsorted.')){S.workouts.forEach(w=>{if(w.folderId===filter)w.folderId=null});S.folders=S.folders.filter(f=>f.id!==filter);filter='all'}break;
-    case 'addw':{const n=prompt('Workout name');if(n&&n.trim()){const w={id:uid(),name:n.trim(),folderId:filter==='all'?null:filter,exercises:[]};S.workouts.push(w);sel=w.id}break}
-    case 'addex':{const w=S.workouts.find(x=>x.id===sel),n=$('#nx').value.trim();if(n)w.exercises.push({id:uid(),name:n,type:$('#nt').value});break}
-    case 'delex':{const w=S.workouts.find(x=>x.id===sel);w.exercises=w.exercises.filter(e=>e.id!==id);break}
-    case 'delw':if(confirm('Delete this workout template? Past history is kept.')){S.workouts=S.workouts.filter(w=>w.id!==sel);sel=null}break;
-    case 'start':{const w=S.workouts.find(x=>x.id===sel);if(!w.exercises.length){toast('Add an exercise first');break}
-      S.active={name:w.name,entries:w.exercises.map(e=>({exId:e.id,name:e.name,type:e.type,sets:[]}))};S.draft={};view='session';break}
-    case 'log':{const ent=S.active.entries[+t.dataset.i],d=draftOf(ent,last(ent.exId));
-      if(ent.type==='cardio'){if(!(+d.t>0)){toast('Enter minutes');return}ent.sets.push({t:+d.t,l:+d.l||0,d:+d.d||0})}
-      else{if(!(+d.r>0)){toast('Enter reps');return}ent.sets.push({w:+d.w||0,r:+d.r})}
-      S.draft[ent.exId]=d;timerStart=Date.now();break}
-    case 'delset':S.active.entries[+t.dataset.i].sets.splice(+t.dataset.j,1);break;
+    case 'delf':if(confirm('Delete this folder? The exercises stay, just untagged.')){S.exercises.forEach(e=>{e.folders=e.folders.filter(x=>x!==filter)});S.folders=S.folders.filter(f=>f.id!==filter);filter='all'}break;
+    case 'adde':adding=!adding;break;
+    case 'addex':{const n=$('#nx').value.trim();if(!n){toast('Enter a name');return}S.exercises.push({id:uid(),name:n,type:$('#nt').value,folders:filter==='all'?[]:[filter]});adding=false;break}
+    case 'tag':{const e=S.exercises.find(x=>x.id===S.cur.exId),i=e.folders.indexOf(id);if(i<0)e.folders.push(id);else e.folders.splice(i,1);break}
+    case 'delex':if(confirm('Delete this exercise? Your logged history is kept.')){const id2=S.cur.exId;commitCur();S.exercises=S.exercises.filter(e=>e.id!==id2);view='home'}break;
+    case 'log':{const ent=S.cur,d=draftOf(ent,last(ent.exId));
+      if(ent.type==='cardio'){if(!(+d.t>0)){toast('Enter minutes');return}if(!ent.sets.length)ent.date=Date.now();ent.sets.push({t:+d.t,l:+d.l||0,d:+d.d||0})}
+      else{if(!(+d.r>0)){toast('Enter reps');return}if(!ent.sets.length)ent.date=Date.now();ent.sets.push({w:+d.w||0,r:+d.r})}
+      S.draft[ent.exId]=d;
+      try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume()}catch(e){}
+      timerEnd=Date.now()+(+S.rest||90)*1000;beeped=false;break}
+    case 'delset':S.cur.sets.splice(+t.dataset.j,1);break;
     case 'mode':S.mode=S.mode==='top'?'avg':'top';toast('Comparing: '+(S.mode==='top'?'Top set':'Average'));break;
-    case 'finish':{const en=S.active.entries.filter(e=>e.sets.length);if(!en.length){toast('Log a set first');return}
-      S.sessions.push({id:uid(),name:S.active.name,date:Date.now(),entries:en});S.active=null;S.draft={};timerStart=null;view='history';break}
-    case 'cancel':if(confirm('Discard this workout?')){S.active=null;S.draft={};timerStart=null;view='workouts'}break;
-    case 'stop':timerStart=null;break;
+    case 'stop':timerEnd=null;break;
+    case 'plus':if(timerEnd){timerEnd=Math.max(timerEnd,Date.now())+15000;beeped=false}break;
     case 'hopen':histOpen=histOpen===id?null:id;break;
-    case 'delsess':if(confirm('Delete this logged workout?'))S.sessions=S.sessions.filter(s=>s.id!==id);break;
+    case 'dellog':if(confirm('Delete this entry?'))S.logs=S.logs.filter(l=>l.id!==id);break;
     case 'pm':pm=id;break;
     case 'unit':S.unit=S.unit==='lb'?'kg':'lb';break;
     case 'exp':{const b=$('#bk');b.value=JSON.stringify(S);b.select();try{navigator.clipboard.writeText(b.value)}catch(e){}toast('Backup ready – copy it somewhere safe');return}
-    case 'imp':{try{const o=JSON.parse($('#bk').value);if(!o.sessions||!o.workouts)throw 0;if(!confirm('Replace all data with this backup?'))return;S=Object.assign(S,o);toast('Imported')}catch(e){toast('Invalid backup');return}break}
+    case 'imp':{try{const o=JSON.parse($('#bk').value);if(!(o.logs||o.sessions))throw 0;if(!confirm('Replace all data with this backup?'))return;
+      S=Object.assign(S,o);S.cur=null;migrate();view='home';toast('Imported')}catch(e){toast('Invalid backup');return}break}
   }
   save();render();tick();
 });
 document.addEventListener('change',ev=>{
   const t=ev.target;
-  if(t.dataset.chg==='folder'){S.workouts.find(w=>w.id===sel).folderId=t.value||null;save()}
-  if(t.dataset.chg==='pex'){pex=t.value;const e=S.sessions.flatMap(s=>s.entries).find(x=>x.exId===pex);pm=e&&e.type==='cardio'?'b':'c';render()}
+  if(t.dataset.chg==='pex'){pex=t.value;const l=S.logs.find(x=>x.exId===pex);pm=l&&l.type==='cardio'?'b':'c';render()}
 });
 document.addEventListener('input',ev=>{
-  const t=ev.target;if(!t.dataset.ex)return;
+  const t=ev.target;
+  if(t.dataset.set){const v=+t.value;S[t.dataset.set]=v>0?v:(t.dataset.set==='rest'?90:2.5);save();return}
+  if(!t.dataset.ex)return;
   (S.draft[t.dataset.ex]=S.draft[t.dataset.ex]||{})[t.dataset.f]=t.value;save();
+  const w=t.closest('.fld').querySelector('.wheel');if(w)setWheel(w,t.value);
 });
+let saveT;
+document.addEventListener('scroll',ev=>{
+  const w=ev.target;if(!w.classList||!w.classList.contains('wheel')||Date.now()<w._lock)return;
+  const i=Math.round(w.scrollTop/44),v=Math.round((+w.dataset.min+i*w.dataset.step)*100)/100,inp=w.closest('.fld').querySelector('input');
+  inp.value=v;(S.draft[inp.dataset.ex]=S.draft[inp.dataset.ex]||{})[inp.dataset.f]=String(v);
+  clearTimeout(saveT);saveT=setTimeout(save,300);
+},true);
+
+/* swipe left on the exercise screen to go back */
+let sx,sy,sg;
+document.addEventListener('touchstart',e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY;sg=e.target},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(view!=='ex'||!sg.closest||sg.closest('.wheel,input'))return;
+  const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+  if(dx<-80&&Math.abs(dx)>Math.abs(dy)*1.5){commitCur();view='home';save();render();tick()}
+},{passive:true});
+
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();tick();
 </script></body></html>
